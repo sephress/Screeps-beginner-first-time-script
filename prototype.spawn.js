@@ -27,7 +27,13 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
         }
         else {
             for (let room in Game.rooms){
-                if (Game.rooms[room].storage){
+                let repairthiscontainer = Game.rooms[room].find(FIND_STRUCTURES, {
+                    filter: (s) => s.structureType == STRUCTURE_CONTAINER 
+                    && s.hits < s.hitsMax*.35})
+                if (repairthiscontainer.length > 0){
+                    this.createCustomCreep(maxEnergy, 'builder', 'builder', room, room.name )
+                }
+                if (Game.rooms[room].find(FIND_STRUCTURES, {filter: (s) => s.structureType == STRUCTURE_CONTAINER})){
                     let sources = Game.rooms[room].find(FIND_SOURCES);
                     for (let source of sources){
                         if(!_.some(Game.creeps, c => c.memory.role == 'miner' && c.memory.source == source.id)){
@@ -43,24 +49,27 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
                     }
                 }
             }
-
-
-
-            // let sources = this.room.find(FIND_SOURCES);
-            // for (let source of sources){
-            //     if(!_.some(creepsInRoom, c => c.memory.role == 'miner' && c.memory.source == source.id)){
-            //         let containers = source.pos.findInRange(FIND_STRUCTURES, 1, {
-            //             filter: s => s.structureType == STRUCTURE_CONTAINER
-            //         });
-            //         if (containers.length > 0){
-            //             name = this.createMiner(maxEnergy, room.name, room.name, source.id)
-            //             // this.memory.new = 'miner'
-            //             break;
-            //         }
-
-            //     }
-            // }
         }
+        // Game.spawns.Spawn1.memory.subjugate = 'W9S6'
+        // Game.spawns.Spawn1.memory.squad = 2
+        // Game.spawns.Spawn1.memory.waypoints = ['SR_WP_1', 'SR_WP_2'];
+        if (!(this.memory.subjugate == undefined)){ 
+            if(!(this.memory.waypoints == undefined)){ 
+                if(!(this.memory.squad == undefined)){
+                    name = this.createSubjugator(maxEnergy, this.memory.subjugate, room.name, this, this.memory.squad, this.memory.waypoints)
+                    if (!(this.memory.squad == 0)){
+                        if (!(name<0)){
+                            this.memory.squad = this.memory.squad-1
+                        }
+                    }
+                    if (this.memory.squad == 0){
+                        delete this.memory.subjugate
+                    }
+                    
+                }
+            }
+        }
+
         if (!(this.memory.attackthisroom == undefined)){ 
             if(numberOfCreeps['soldier'] == 0){ 
                 name = this.createSoldier(maxEnergy, this.memory.attackthisroom, room.name, this)
@@ -97,11 +106,11 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
             }
 
         }
-
+        //Game.spawns.Spawn1.memory.claimRoom = 'W8S6'
         if (name == -2){
             for(let role of listOfRoles){
                 if(role == 'claimer' && this.memory.claimRoom != undefined){
-                    name = this.createClaimer(1, this.memory.claimRoom, this);
+                    name = this.createClaimer(1, this.memory.claimRoom, this, this.memory.claimRoom);
                     if(!(name < 0)){
                         delete this.memory.claimRoom;
                     }
@@ -112,20 +121,21 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
                         // this.memory.new = 'mover'
                     }
                     else {
-                        name = this.createCustomCreep(maxEnergy, role, role)
+                        name = this.createCustomCreep(maxEnergy, role, role, room.name, room.name)
                         // this.memory.new = role
                     }
                     break;
                 }
             }
         }
-        
+        //Game.spawns.Spawn2.memory.minLongDistanceHarvesters = {W8S5: 2}
         let numberOfLongDistanceHarvesters = _.sum(Game.creeps, (c) => c.memory.role == 'longDistanceHarvester')
         if(name == -2){
+            workparts = this.room.controller.level
             for(let roomName in this.memory.minLongDistanceHarvesters){
                 numberOfLongDistanceHarvesters = _.sum(Game.creeps, (c) => c.memory.role == 'longDistanceHarvester' && c.memory.target == roomName);
                 if(numberOfLongDistanceHarvesters < this.memory.minLongDistanceHarvesters[roomName]){
-                    name = this.createlongDistanceHarvester(maxEnergy, 'longDistanceHarvester','LDH'+roomName, 3, room.name, roomName, this)
+                    name = this.createlongDistanceHarvester(maxEnergy, 'longDistanceHarvester','LDH'+roomName, workparts, room.name, roomName, this)
                 }
                 if (numberOfLongDistanceHarvesters == this.memory.minLongDistanceHarvesters[roomName]){ 
                     timeToClaim = this.room.find(FIND_STRUCTURES, {
@@ -135,7 +145,7 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
                     if (timeToClaim){
                         numberOfClaimers = _.sum(Game.creeps, (c) => c.memory.role == 'claimer' && c.memory.target == roomName);
                         if(numberOfClaimers < 1){
-                            name = this.createClaimer(2, roomName, this)
+                            name = this.createClaimer(2, roomName, this, null)
                         }
                     }
                     
@@ -184,7 +194,7 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
 
 
     StructureSpawn.prototype.createCustomCreep = 
-    function (energy, roleName, creepName){
+    function (energy, roleName, creepName, TARGET, HOME){
         var numberOfParts = Math.floor(energy/200);
         var body = [];
         for (let i =0; i < numberOfParts; i++){
@@ -197,7 +207,7 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
             body.push(MOVE);
         }
  
-        return this.spawnCreep(body, creepName + Game.time, {memory: {role: roleName, working: false}});
+        return this.spawnCreep(body, creepName + Game.time, {memory: {role: roleName, working: false, target: TARGET, home: HOME}});
     };
 
     StructureSpawn.prototype.createlongDistanceHarvester = 
@@ -227,15 +237,15 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
        }; 
 
     StructureSpawn.prototype.createClaimer = 
-       function (numberOfParts,TARGET, spawnhome){
+       function (numberOfParts,TARGET, spawnhome, claim){
         var body = [];
         for (let i = 0; i < numberOfParts; i++){
             body.push(CLAIM);
         }
-        for (let i = 0; i < 1; i++){
+        for (let i = 0; i < numberOfParts; i++){
             body.push(MOVE);
         }
-           return this.spawnCreep(body, 'claimer' + Game.time, {memory: {role: 'claimer', target: TARGET, spawn: spawnhome}});
+           return this.spawnCreep(body, 'claimer' + Game.time, {memory: {role: 'claimer', target: TARGET, spawn: spawnhome, claim: claim}});
        };         
 
     StructureSpawn.prototype.createSoldier = function (energy, TARGET, HOME, SPAWNHOME){
@@ -245,4 +255,31 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
             body.push(TOUGH,TOUGH,ATTACK,MOVE,MOVE);
         }
         return this.spawnCreep(body, 'soldier' + Game.time, {memory:{role: 'soldier', target: TARGET, home: HOME, spawn: SPAWNHOME}})
-    }
+    };
+
+    StructureSpawn.prototype.createSubjugator = function (energy, TARGET, HOME, SPAWNHOME, SQUAD, WAYPOINTS){
+        var numberOfParts = Math.floor(energy/600);
+        var body = [];
+        for (let i =0; i < numberOfParts; i++){
+            body.push(TOUGH, TOUGH);
+        }
+        for (let i =0; i < numberOfParts; i++){
+            body.push(MOVE, RANGED_ATTACK, ATTACK);
+        }
+        for (let i =0; i < numberOfParts; i++){
+            body.push(MOVE);
+        }
+        for (let i =0; i < numberOfParts; i++){
+            body.push(HEAL);
+        }
+        return this.spawnCreep(body, 'subjugator' + Game.time, {memory:{
+            role: 'subjugator',
+            target: TARGET,
+            home: HOME,
+            spawn: SPAWNHOME,
+            subjugate: false,
+            rally: true,
+            squad: SQUAD,
+            defend: false,
+            waypoints: WAYPOINTS}})
+    };

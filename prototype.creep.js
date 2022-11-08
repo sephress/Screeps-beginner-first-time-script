@@ -9,7 +9,8 @@ var roles = {
     hauler: require('role.hauler'),
     mover: require('role.mover'),
     claimer: require('role.claimer'),
-    soldier: require('role.soldier')
+    soldier: require('role.soldier'),
+    subjugator: require('role.subjugator')
 
 };
 
@@ -33,13 +34,13 @@ Creep.prototype.getEnergy = function(useContainer, useSource, containerCap, stor
             })
             if(container){
                 if (this.withdraw(container, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE){
-                    this.moveTo(container);
+                    this.travelTo(container);
                     this.say('⏹')
                 }
             }
             if(!container){
                 if(this.withdraw(storageBuildingenergy, RESOURCE_ENERGY)==ERR_NOT_IN_RANGE){
-                    this.moveTo(storageBuildingenergy);
+                    this.travelTo(storageBuildingenergy);
                     this.say('🏪')
                 }
             }
@@ -47,7 +48,7 @@ Creep.prototype.getEnergy = function(useContainer, useSource, containerCap, stor
         if ((!container && !storageBuildingenergy) && useSource == true){
             var source = this.pos.findClosestByPath(FIND_SOURCES_ACTIVE);
             if(this.harvest(source)== ERR_NOT_IN_RANGE){
-                this.moveTo(source)
+                this.travelTo(source)
                 this.say('⛏')
             }
         }
@@ -55,8 +56,14 @@ Creep.prototype.getEnergy = function(useContainer, useSource, containerCap, stor
             var storageBuilding = this.pos.findClosestByPath(FIND_STRUCTURES, {
                 filter: (s) => s.structureType == STRUCTURE_STORAGE
             });
-                this.moveTo(storageBuilding)
-                this.say('🪑')
+                if(storageBuilding){
+                    this.travelTo(storageBuilding)
+                    this.say('🪑')
+                }
+                if(storageBuilding==undefined){
+                    var home = this.pos.findClosestByPath(FIND_STRUCTURES, {filter: s => s.structureType == STRUCTURE_SPAWN})
+                    this.travelTo(home);
+                }
         }
 
     }
@@ -74,18 +81,18 @@ Creep.prototype.WorkCheck = function(){
 
 Creep.prototype.FindDroppedEnergy = function(useContainer, useSource, containerCap, storageCap) {
     var tombstonewithenergy = this.pos.findClosestByPath(FIND_TOMBSTONES, {
-        filter: (t) => t.store[RESOURCE_ENERGY] > 0
+        filter: (t) => t.store[RESOURCE_ENERGY] > 100
     });
     var droppedenergy =  this.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {filter: (r) => r.resourceType == RESOURCE_ENERGY});
-    if (!(droppedenergy==null)){
+    if (!(droppedenergy==null) && droppedenergy > 200){
         if (this.pickup(droppedenergy, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE){
-        this.moveTo(droppedenergy);
+        this.travelTo(droppedenergy);
         }
         this.say('⚡')
     }
     if (tombstonewithenergy){
         if (this.withdraw(tombstonewithenergy, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE){
-        this.moveTo(tombstonewithenergy);
+        this.travelTo(tombstonewithenergy);
         }
         this.say('💀')
     }
@@ -98,7 +105,7 @@ Creep.prototype.FindDroppedEnergy = function(useContainer, useSource, containerC
 
 Creep.prototype.Upgrade = function(){
     if(this.upgradeController(this.room.controller) == ERR_NOT_IN_RANGE){
-        this.moveTo(this.room.controller); 
+        this.travelTo(this.room.controller); 
     }
 }
 
@@ -108,7 +115,7 @@ Creep.prototype.RepairStructure = function(){
     });
     if (repairablestructure) {
         if(this.repair(repairablestructure) == ERR_NOT_IN_RANGE){
-            this.moveTo(repairablestructure);
+            this.travelTo(repairablestructure);
         }
     }
     else{
@@ -120,7 +127,7 @@ Creep.prototype.BuildStructure = function(){
     var construction = this.pos.findClosestByPath(FIND_CONSTRUCTION_SITES);
     if (construction) {
         if(this.build(construction) == ERR_NOT_IN_RANGE){
-            this.moveTo(construction); 
+            this.travelTo(construction); 
         }  
     }
     else{
@@ -136,15 +143,25 @@ Creep.prototype.IWasHit = function(){
     this.memory.lasthits = this.hits;
 }
 
+Creep.prototype.DefendMyself = function(){
+    if(this.hits < this.memory.lasthits) {
+        this.memory.defend = true
+    };
+    if(this.hits == this.hitsMax){
+        this.memory.defend = false
+    };
+    this.memory.lasthits = this.hits;
+}
+
 Creep.prototype.IAmNotAlone = function(){
     var enemy = this.pos.findClosestByPath(FIND_HOSTILE_CREEPS)
-    var enemyStructure = this.pos.findClosestByPath(FIND_HOSTILE_STRUCTURES)
+    var enemyStructure = this.pos.findClosestByPath(FIND_HOSTILE_STRUCTURES, {filter: s => s.structureType !== STRUCTURE_CONTROLLER})
     var enemyPowerCreeps = this.pos.findClosestByPath(FIND_HOSTILE_POWER_CREEPS);
     var defendedBySoldier = this.pos.findClosestByPath(FIND_MY_CREEPS, {filter: c => c.memory.role == 'soldier'})
     if (defendedBySoldier){
         delete Game.spawns[this.memory.spawn.name].memory.attackthisroom
     }
-    else if(defendedBySoldier == null){
+    else if(defendedBySoldier == null && this.room !== this.memory.home ){
         if (enemy){
             Game.spawns[this.memory.spawn.name].memory.attackthisroom = this.room.name
         }
@@ -155,6 +172,16 @@ Creep.prototype.IAmNotAlone = function(){
             Game.spawns[this.memory.spawn.name].memory.attackthisroom = this.room.name
         }
     }
-    
+}
 
+Creep.prototype.EnergyDelivered = function(){
+    
+    if (this.memory.working == true){
+        for (let i =0; i < 1; i++){
+            this.memory.resource = this.memory.resource + this.store.getUsedCapacity(RESOURCE_ENERGY)
+            if (this.ticksToLive==10){
+                console.log(this.memory.resource)
+            }
+        }
+    }
 }

@@ -2,6 +2,8 @@
 require('prototype.creep');
 require('prototype.tower');
 require('prototype.spawn');
+require('prototype.manager');
+var Traveler = require('Traveler');
 
 module.exports.loop = function() {
     //loop to clear the creep memory
@@ -23,8 +25,8 @@ module.exports.loop = function() {
 
     for (let spawnName in Game.spawns){
         Game.spawns[spawnName].spawnCreepsIfNecessary();
-
+        Game.spawns[spawnName].RCLCheck();
     }
-    // console.log(Game.rooms["W8S7"].controller.reservation.username)
+    // console.log(Game.spawns.Spawn1.room.find(FIND_SOURCES).length)
     
 };

@@ -7,12 +7,15 @@ module.exports = {
         creep.IAmNotAlone();
         //tells the creep how to work what task is it doing?
         if (creep.memory.working == true) {
-            if (creep.room.name == creep.memory.target){
+            
+            if(creep.room.name == creep.memory.target)
                 creep.RepairStructure();
+
                 creep.BuildStructure();
-            }
+            
 
             if (creep.room.name == creep.memory.home){
+                
                 var excess = creep.pos.findClosestByPath(FIND_STRUCTURES, {
                     filter: (s) => (s.structureType == STRUCTURE_CONTAINER 
                         || s.structureType == STRUCTURE_STORAGE)   
@@ -21,30 +24,36 @@ module.exports = {
                 //Im home and have a storage to fill
                 if (excess != null){
                     if(creep.transfer(excess, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-                            creep.moveTo(excess, {reusePath: 10} );
+                            creep.travelTo(excess);
                             creep.say('⏹')
                     }
                 }
             }
             else {
-                var exit = creep.room.findExitTo(creep.memory.home);
-                creep.moveTo(creep.pos.findClosestByPath(exit));
+                var home = creep.memory.spawn.name
+                creep.travelTo(Game.spawns[home].pos);
             }
 
         }
         //If not working then what is the creep doing?
         else {
             if (creep.room.name == creep.memory.target){
-                creep.FindDroppedEnergy (true,true,0,0);
+                var minerworking = creep.pos.findClosestByPath(FIND_MY_CREEPS, {filter: c => c.memory.role == 'miner'})
+                if (minerworking){
+                    creep.FindDroppedEnergy(true,false,0,0);
+                }
+                else {
+                    creep.FindDroppedEnergy (true,true,0,0);
+                }
             }
-            if (Game.spawns[creep.memory.spawn.name].memory.ineedhelp == creep.memory.target){
-                var exit = creep.room.findExitTo(creep.memory.home);
-                creep.moveTo(creep.pos.findClosestByPath(exit));
-            }
+            // if (Game.spawns[creep.memory.spawn.name].memory.ineedhelp == creep.memory.target){
+            //     var exit = creep.room.findExitTo(creep.memory.home);
+            //     creep.travelTo(creep.pos.findClosestByPath(exit));
+            // }
                 
             else{
-                var exit = creep.room.findExitTo(creep.memory.target);
-                creep.moveTo(creep.pos.findClosestByPath(exit));
+                var target = creep.memory.target
+                creep.travelTo(Game.flags[target].pos);
             }
         }
     }
